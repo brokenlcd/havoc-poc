@@ -19,6 +19,7 @@
 #include <err.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #define INIT_TIME       10
@@ -28,8 +29,9 @@
 #define RBG0            "/dev/arandom"
 #define RBG1            "/dev/urandom"
 
-unsigned char median0;    // median value for ANALOG0
-unsigned char median1;    // median value for ANALOG1
+unsigned char   median0;    // median value for ANALOG0
+unsigned char   median1;    // median value for ANALOG1
+unsigned int    debug;
 
 
 /*
@@ -112,13 +114,15 @@ setup()
         time_t stop = start + INIT_TIME;
         time_t cur, lastt;
 
-        //printf("[+] starting initialisation\n");
+        if (debug)
+                printf("[+] starting initialisation\n");
         for (i = 0; i < NSAMP; i++) {
                 samp0[i] = 0;
                 samp1[i] = 0;
         }
 
-        //printf("\t[*] collecting reference samples\n");
+        if (debug) 
+                printf("\t[*] collecting reference samples\n");
         start = time(NULL);
         stop = start + INIT_TIME;
         lastt = start;
@@ -127,12 +131,16 @@ setup()
                 samp1[readRBG1(1)]++;
                 cur = time(NULL);
                 if (cur != lastt) {
-                        printf("\t[*] %d seconds left\n", (int)(stop - cur));
+                        if (debug)
+                                printf("\t[*] %d seconds left\n",
+                                        (int)(stop - cur));
                         lastt = cur;
                 }
         }
 
-        //printf("\t[*] calculating median\n");
+        if (debug)
+                printf("\t[*] calculating median\n");
+
         median0 = sum0 = 0;
         median1 = sum1 = 0;
         for (i = 0; i < NSAMP; i++) {
@@ -160,9 +168,11 @@ setup()
         }
         median0 = samp0[i];
         median1 = samp1[i];
-        //printf("[+] initialisation complete\n");
-        //printf("\t[*] RBG0 median: %d\n", median0);
-        //printf("\t[*] RBG1 median: %d\n", median1);
+        if (debug) {
+                printf("[+] initialisation complete\n");
+                printf("\t[*] RBG0 median: %d\n", median0);
+                printf("\t[*] RBG1 median: %d\n", median1);
+        }
 }
 
 /*
@@ -197,23 +207,39 @@ loop()
         int rbit = readRBG();
 
         if (rbit != -1) {
-                //printf(".");
+                if (debug)
+                        printf(".");
                 rval |= (rbit << n);
                 n++;
                 if (n == 8) {
-                        printf("%c\n", rval);
+                        if (debug)
+                                printf("1 %02x\n", rval);
+                        else
+                                printf("%c\n", rval);
                         rval = 0;
                         n = 0;
                 }
         } else {
-                //printf("!");
+                if (debug)
+                        printf("!");
         }
 }
 
 
 int
-main(void)
+main(int argc, char *argv[])
 {
+        int ch;
+        while ((ch = getopt(argc, argv, "d")) != -1) {
+                switch (ch) {
+                case 'd':
+                        debug = 1;
+                        break;
+                default:
+                        abort();
+                }
+        }
+
         setup();
         while (1) {
                 loop();
