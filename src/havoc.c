@@ -20,6 +20,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 
 #define INIT_TIME       10
@@ -40,7 +41,7 @@ unsigned int    debug;
  * the value is to be discarded. If the value is below the median,
  * a 0 is returned. If the value is above the median, a 1 is returned.
  */
-int
+static int
 readRBG0(int calibrate)
 {
         static int rbg0fd = 0;
@@ -67,7 +68,7 @@ readRBG0(int calibrate)
         return -1;
 }
 
-int
+static int
 readRBG1(int calibrate)
 {
         static int rbg1fd = 0;
@@ -99,8 +100,8 @@ readRBG1(int calibrate)
  * setup collects samples for 10 seconds, taking the median value
  * from each for calibration.
  */
-void
-setup()
+static void
+setup(void)
 {
         int i = 0;
         unsigned int samp0[NSAMP];
@@ -181,8 +182,8 @@ setup()
  * does indicate a fault in the RBG, but rather that the result was discarded
  * and a new result should be taken.
  */
-int
-readRBG()
+static int
+readRBG(void)
 {
         int b0 = readRBG0(0);
         int b1 = readRBG1(0);
@@ -199,8 +200,8 @@ readRBG()
  * once a full byte has been built, it will be written out to the serial
  * port.
  */
-void
-loop()
+static void
+loop(void)
 {
         static unsigned char rval = 0;   // The random byte being built.
         static int n = 0;       // The current bit position in the byte.
@@ -243,7 +244,8 @@ main(int argc, char *argv[])
         setup();
         while (1) {
                 loop();
-                //fflush(stdout);
+                if (debug)
+                        fflush(stdout);
                 sleep(1);
         }
 }
