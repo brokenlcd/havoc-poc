@@ -1,0 +1,12 @@
+havoc-poc:
+
+        This is the proof-of-concept code to verify the logic in the
+        Arduino sketch for the Havoc OSRNG.
+
+        Usage: havoc [-d]
+                -d      Enter debug mode, with more output and 1s delay between
+                        RBG samples.
+
+        This should be tested on OpenBSD, which has two separate RNGs
+        (/dev/arandom and /dev/urandom). On other operating systems, a
+        single RNG defeats the purpose of the POC.
