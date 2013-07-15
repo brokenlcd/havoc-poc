@@ -18,12 +18,13 @@
 #include <sys/types.h>
 #include <err.h>
 #include <fcntl.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
 
-#define INIT_TIME       10
+#define INIT_TIME       12
 #define RNGPUT          1
 #define NSAMP           256
 
@@ -33,6 +34,7 @@
 unsigned char   median0;    // median value for ANALOG0
 unsigned char   median1;    // median value for ANALOG1
 unsigned int    debug;
+unsigned int    mode32;
 
 
 /*
@@ -104,6 +106,7 @@ static void
 setup(void)
 {
         int i = 0;
+        int samples = 0;
         unsigned int samp0[NSAMP];
         unsigned int samp1[NSAMP];
         int sum0 = 0;
@@ -137,10 +140,23 @@ setup(void)
                                         (int)(stop - cur));
                         lastt = cur;
                 }
+                usleep(1000);
+                samples++;
         }
 
-        if (debug)
+        if (debug) {
+                for (i = 0; i < NSAMP; i++) {
+                        printf("\t%d\t\tsamp0: %d\t\tsamp1: %d\n", i, samp0[i],
+                            samp1[i]);
+                }
+                sleep(4);
+        }
+
+
+        if (debug) {
+                printf("\t[*] collected %d samples\n", samples);
                 printf("\t[*] calculating median\n");
+        }
 
         median0 = sum0 = 0;
         median1 = sum1 = 0;
@@ -169,6 +185,8 @@ setup(void)
         }
         median0 = samp0[i];
         median1 = samp1[i];
+        median0 = 128;
+        median1 = 128;
         if (debug) {
                 printf("[+] initialisation complete\n");
                 printf("\t[*] RBG0 median: %d\n", median0);
@@ -196,12 +214,12 @@ readRBG(void)
 }
 
 /*
- * loop begins once Havoc has been calibrated. It builds a byte at a time;
+ * loop8 begins once Havoc has been calibrated. It builds a byte at a time;
  * once a full byte has been built, it will be written out to the serial
  * port.
  */
 static void
-loop(void)
+loop8(void)
 {
         static unsigned char rval = 0;   // The random byte being built.
         static int n = 0;       // The current bit position in the byte.
@@ -209,7 +227,7 @@ loop(void)
 
         if (rbit != -1) {
                 if (debug)
-                        printf(".");
+                        printf("\t%d . %02x\n", n, rbit);
                 rval |= (rbit << n);
                 n++;
                 if (n == 8) {
@@ -222,19 +240,53 @@ loop(void)
                 }
         } else {
                 if (debug)
-                        printf("!");
+                        printf("\t%d !\n", n);
         }
 }
 
+
+/*
+ * loop32 begins once Havoc has been calibrated. It builds 32-bit
+ * unsigned intenger at a time; once a full byte has been built,
+ * it will be written out to the serial port.
+ */
+static void
+loop32(void)
+{
+        static uint32_t rval = 0;       /* Random int being built. */
+        static int      n = 0;          /* The current bit position. */
+        int rbit = readRBG();
+
+        if (rbit != -1) {
+                if (debug)
+                        printf("\t%d . %02x\n", n, rbit);
+                rval |= (rbit << n);
+                n++;
+                if (n == 32) {
+                        if (debug)
+                                printf("1 %u\n", rval);
+                        else
+                                printf("%u\n", rval);
+                        rval = 0;
+                        n = 0;
+                }
+        } else {
+                if (debug)
+                        printf("\t%d !\n", n);
+        }
+}
 
 int
 main(int argc, char *argv[])
 {
         int ch;
-        while ((ch = getopt(argc, argv, "d")) != -1) {
+        while ((ch = getopt(argc, argv, "dn")) != -1) {
                 switch (ch) {
                 case 'd':
                         debug = 1;
+                        break;
+                case 'n':
+                        mode32 = 1;
                         break;
                 default:
                         abort();
@@ -243,9 +295,11 @@ main(int argc, char *argv[])
 
         setup();
         while (1) {
-                loop();
+                if (mode32)
+                        loop32();
+                else
+                        loop8();
                 if (debug)
-                        fflush(stdout);
-                sleep(1);
+                        sleep(1);
         }
 }
